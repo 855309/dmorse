@@ -119,7 +119,6 @@
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Signal.cs" />
-    <Compile Include="SignalType.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

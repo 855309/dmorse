@@ -182,7 +182,7 @@ namespace dmorse
                 return s.Type == SignalType.Empty ? s.Duration : maxEmpDur;
             });
 
-            if (minEmpDur == 1)
+            if (minEmpDur == 1) // i'm not very sure about this
             {
                 if (debug) Console.WriteLine("WPM is high, trying to adjust the spacing... (Result can be affected)");
 
@@ -202,6 +202,26 @@ namespace dmorse
                 });
 
                 minEmpDur = min;
+            }
+
+            if (minFullDur == 1)
+            {
+                if (debug) Console.WriteLine("Error signal or very high (60<) WPM. Trying to fix... (Result can be affected)");
+
+                /* getting the next min. space dur. */
+                int min = msignal.Min((s) =>
+                {
+                    if (s.Type == SignalType.Full && s.Duration != minFullDur)
+                    {
+                        return s.Duration;
+                    }
+                    else
+                    {
+                        return maxFullDur;
+                    }
+                });
+
+                minFullDur = min;
             }
 
             List<List<Signal>> words = new List<List<Signal>>();
@@ -238,8 +258,8 @@ namespace dmorse
                     return s.Type == SignalType.Empty ? s.Duration : 0;
                 });
 
-                double fullTolerance = (maxFullDur - minFullDur) / 3;
-                double empTolerance = (maxEmpDur - minEmpDur) / 3;
+                double fullTolerance = (maxFullDur - minFullDur) / 4;
+                double empTolerance = (maxEmpDur - minEmpDur) / 4;
 
                 /* parsing letters/symbols */
                 List<List<Signal>> symbols = new List<List<Signal>>();
