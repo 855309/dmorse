@@ -6,6 +6,12 @@ using System.Threading.Tasks;
 
 namespace dmorse
 {
+    internal enum SignalType
+    {
+        Empty = 0,
+        Full = 1,
+    }
+
     internal class Signal
     {
         public SignalType Type { get; set; }
