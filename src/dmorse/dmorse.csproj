@@ -104,9 +104,11 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Decoder.cs" />
+    <Compile Include="Generator.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Signal.cs" />
+    <Compile Include="Chunk.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />

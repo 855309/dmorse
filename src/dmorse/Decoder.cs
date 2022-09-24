@@ -266,6 +266,7 @@ namespace dmorse
 
             double filterdB = 50; // min. dB for peak frequency
             // TODO: Make filter dB relative
+            // ????
 
             int height = fftsize / 2; // for the frequency map
 

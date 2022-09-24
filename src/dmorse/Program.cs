@@ -14,43 +14,202 @@ namespace dmorse
     internal class Program // TODO: Think how to fix real-time decoding (not working currently)
     {
         public static Decoder decoder = null;
+        public static Generator generator = null;
+
         public static WaveInEvent deviceInput = null;
         public static int devSampleRate = 48000;
 
         public static Timer decTimer = null;
-        public static int timerInterval = 1000; // hmm
+        public static int timerInterval = 3000; // hmm
+        public static List<Argument> argList = new List<Argument>();
+        public static bool debug = false;
 
-        static void Main(string[] args)
+        // 0 => check if there
+        // 1 => get val
+        public static List<(string, string, int)> argvls = new List<(string, string, int)>() 
+        { 
+            ("debug", "", 0), 
+            ("out", "out.wav", 1), 
+            ("wpm", "25", 1), 
+            ("freq", "800", 1),
+            ("vol", "0.5", 1)
+        }; 
+        static void PrintUsage()
         {
-            string[] alphabetData;
-            bool debug = false;
+            Console.WriteLine("Usage: dmorse [decode/generate] [audio/text file] [options]...");
+            Console.WriteLine("\t\t --debug:           Print debug messages.");
+            Console.WriteLine("\t\t --out <string>:    Set the output audio file.");
+            Console.WriteLine("\t\t --wpm <int>:       Set the output wpm. (Default: 25)");
+            Console.WriteLine("\t\t --freq <int>:      Set the output frequency. (Default: 800)");
+            Console.WriteLine("\t\t --vol <double>:    Set the output volume. Min. 0, Max. 1 (Default: 0.5)");
+        }
+
+        static List<Argument> ParseArgs(string[] args)
+        {
+            List<Argument> argList = new List<Argument>();
 
             if (args.Length < 1)
             {
-                Console.WriteLine("Usage: dmorse [audiofile] [options]...");
+                PrintUsage();
                 Environment.Exit(-1);
             }
 
-            string path = args[0];
+            argList.Add(new Argument("instr", args[0]));
+            argList.Add(new Argument("file", args[1]));
 
-            alphabetData = File.ReadAllLines("morse/symbols.txt");
-
-            foreach (string arg in args)
+            for (int i = 0; i < args.Length; i++)
             {
-                if (arg == "--debug")
+                foreach (var a in argvls)
                 {
-                    debug = true;
+                    if (args[i] == "--" + a.Item1)
+                    {
+                        if (a.Item3 == 0)
+                        {
+                            argList.Add(new Argument(a.Item1, ""));
+                        }
+                        else
+                        {
+                            if (i + 1 < args.Length)
+                            {
+                                argList.Add(new Argument(a.Item1, args[i + 1]));
+                            }
+                            else
+                            {
+                                PrintUsage();
+                                Environment.Exit(-2);
+                            }
+                        }
 
-                    break;
+                        break;
+                    }
                 }
             }
 
-            decoder = new Decoder(debug, alphabetData);
-
-            new Program().MainAsync(path).GetAwaiter().GetResult();
+            return argList;
         }
 
-        public async Task MainAsync(string path)
+        static bool CheckArg(string name)
+        {
+            foreach (Argument arg in argList)
+            {
+                if (arg.Name == name)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        static string GetArgVal(string name)
+        {
+            foreach (Argument arg in argList)
+            {
+                if (arg.Name == name)
+                {
+                    return arg.Value;
+                }
+            }
+
+            foreach (var a in argvls)
+            {
+                if (a.Item1 == name)
+                {
+                    return a.Item2; // return default
+                }
+            }
+
+            return null;
+        }
+
+        /*static void test(string[] alphabetData)
+        {
+            Random rand = new Random();
+            for (int i = 0; i < 1000; i++)
+            {
+                Stopwatch stp = new Stopwatch();
+
+                string tdata = new string(Enumerable.Repeat("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", rand.Next(3, 13)).Select(s => s[rand.Next(s.Length)]).ToArray()).Trim();
+
+                while (tdata.Contains("  "))
+                {
+                    tdata = tdata.Replace("  ", " ");
+                }
+
+                while (tdata.Trim() == "")
+                {
+                    tdata = new string(Enumerable.Repeat("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", rand.Next(3, 20)).Select(s => s[rand.Next(s.Length)]).ToArray()).Trim();
+                }
+
+                stp.Start();
+                Generator gen = new Generator(alphabetData, tdata, rand.Next(10, 50), "test/test.wav", rand.Next(600, 1000));
+
+                (WaveHeaderChunk header, WaveFormatChunk format, WaveDataChunk data) = gen.GenerateAudio();
+                gen.WriteWavefile(header, format, data);
+
+                long genms = stp.ElapsedMilliseconds;
+                stp.Restart();
+
+                Decoder dec = new Decoder(false, alphabetData);
+
+                (int sampleRate, double[] audata) = AudioFile.ReadMono("test/test.wav");
+
+                double[][] fftdata = dec.Transform(audata, sampleRate);
+                List<Signal> signaldata = dec.ParseFFTData(fftdata, sampleRate);
+
+                string sigout = dec.DecodeSignal(signaldata);
+
+                long decms = stp.ElapsedMilliseconds;
+                stp.Stop();
+
+                if (sigout == tdata)
+                {
+                    Console.WriteLine("[TEST] Correct. Gen: {0} ms. Dec: {1} ms.", genms, decms);
+                }
+                else
+                {
+                    Console.WriteLine("[TEST] Error! Data: {0}. Sigdata: {1}.", tdata, sigout);
+                    Console.ReadLine();
+                }
+            }
+
+            Console.WriteLine("[TEST] Finished.");
+            Console.ReadLine();
+            Environment.Exit(0);
+        }*/
+
+        static void Main(string[] args)
+        {
+            string[] alphabetData = File.ReadAllLines("morse/symbols.txt");
+
+            // test(alphabetData);
+
+            argList = ParseArgs(args);
+            debug = CheckArg("debug");
+
+            string instr = GetArgVal("instr");
+            if (instr == "decode")
+            {
+                decoder = new Decoder(debug, alphabetData);
+
+                new Program().DecodeAsync(GetArgVal("file")).GetAwaiter().GetResult();
+            }
+            else if (instr == "generate")
+            {
+                string strdata = File.ReadAllText(GetArgVal("file")).Trim().ToUpper();
+
+                int wpm = Convert.ToInt32(GetArgVal("wpm"));
+                string outfile = GetArgVal("out");
+                int freq = Convert.ToInt32(GetArgVal("freq"));
+                double vol = Convert.ToDouble(GetArgVal("vol"));
+
+                generator = new Generator(alphabetData, strdata, wpm, outfile, freq, vol);
+
+                (WaveHeaderChunk header, WaveFormatChunk format, WaveDataChunk data) = generator.GenerateAudio();
+                generator.WriteWavefile(header, format, data);
+            }
+        }
+
+        public async Task DecodeAsync(string path)
         {
             string[] pts = path.Split(':');
             if (pts[0] == "device" && pts.Length == 2)
@@ -112,7 +271,8 @@ namespace dmorse
             decTimer.Change(timerInterval, Timeout.Infinite);
         }
 
-        // string lastStr = "";
+        string cbuf = "";
+        //string cStr = "";
         private void DecodeBuffer()
         {
             double[][] fftdata = decoder.Transform(buffer.ToArray(), devSampleRate);
@@ -127,9 +287,23 @@ namespace dmorse
 
             if (output != "")
             {
-                Console.Write(output);
+                Console.WriteLine(cbuf + output);
                 buffer.Clear();
+
+                cbuf += output;
             }
+        }
+    }
+
+    internal class Argument
+    {
+        public string Name { get; set; }
+        public string Value { get; set; }
+
+        public Argument(string n, string v)
+        {
+            this.Name = n;
+            this.Value = v;
         }
     }
 
